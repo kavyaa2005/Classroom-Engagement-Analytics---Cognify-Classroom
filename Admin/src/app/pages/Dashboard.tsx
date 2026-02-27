@@ -20,99 +20,79 @@ import {
   Area,
   AreaChart,
 } from "recharts";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { adminAPI } from "../../services/api";
 
-const engagementData = {
-  daily: [
-    { date: "Mon", engagement: 72 },
-    { date: "Tue", engagement: 68 },
-    { date: "Wed", engagement: 75 },
-    { date: "Thu", engagement: 82 },
-    { date: "Fri", engagement: 78 },
-  ],
-  weekly: [
-    { date: "Week 1", engagement: 65 },
-    { date: "Week 2", engagement: 71 },
-    { date: "Week 3", engagement: 68 },
-    { date: "Week 4", engagement: 78 },
-  ],
-  monthly: [
-    { date: "Jan", engagement: 70 },
-    { date: "Feb", engagement: 75 },
-    { date: "Mar", engagement: 78 },
-  ],
-};
+interface ClassData {
+  _id: string;
+  name: string;
+  section?: string;
+  subject?: string;
+  teacherName: string;
+  teacherEmail: string;
+  studentCount: number;
+  avgEngagement: number;
+  sessionCount: number;
+}
 
-const classData = [
-  {
-    id: 1,
-    name: "Class 8A",
-    teacher: "Sarah Johnson",
-    students: 32,
-    engagement: 85,
-    status: "High",
-  },
-  {
-    id: 2,
-    name: "Class 8B",
-    teacher: "Michael Chen",
-    students: 28,
-    engagement: 62,
-    status: "Medium",
-  },
-  {
-    id: 3,
-    name: "Class 9A",
-    teacher: "Emily Davis",
-    students: 30,
-    engagement: 78,
-    status: "High",
-  },
-  {
-    id: 4,
-    name: "Class 9B",
-    teacher: "Robert Smith",
-    students: 25,
-    engagement: 45,
-    status: "Low",
-  },
-  {
-    id: 5,
-    name: "Class 10A",
-    teacher: "Lisa Anderson",
-    students: 27,
-    engagement: 72,
-    status: "Medium",
-  },
-];
-
-const alerts = [
-  {
-    id: 1,
-    message: "Class 8B engagement dropped below 50%",
-    time: "2 minutes ago",
-    urgent: true,
-  },
-  {
-    id: 2,
-    message: "Teacher John needs attention in Class 9B",
-    time: "15 minutes ago",
-    urgent: true,
-  },
-  {
-    id: 3,
-    message: "Outstanding performance in Class 8A - 90% engagement",
-    time: "1 hour ago",
-    urgent: false,
-  },
-];
+interface DashboardData {
+  totalStudents: number;
+  totalTeachers: number;
+  activeSessions: number;
+  overallEngagement: number;
+  weeklyTrend: Array<{ date: string; engagement: number }>;
+  classrooms: ClassData[];
+}
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const [timeRange, setTimeRange] = useState<"daily" | "weekly" | "monthly">(
-    "weekly"
-  );
+  const [timeRange, setTimeRange] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboard = async () => {
+      try {
+        const response = await adminAPI.getDashboard();
+        if (response.data.success) {
+          setDashboardData(response.data.data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDashboard();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const classData = dashboardData?.classrooms.map((c) => ({
+    id: c._id,
+    name: `${c.name} ${c.section || ""}`.trim(),
+    teacher: c.teacherName,
+    students: c.studentCount,
+    engagement: c.avgEngagement,
+    status: c.avgEngagement >= 80 ? "High" : c.avgEngagement >= 60 ? "Medium" : "Low",
+  })) || [];
+
+  const alerts = classData
+    .filter((c) => c.engagement < 60)
+    .slice(0, 3)
+    .map((c, i) => ({
+      id: i + 1,
+      message: `${c.name} engagement at ${c.engagement}% - needs attention`,
+      time: "Recently",
+      urgent: c.engagement < 50,
+    }));
 
   const filteredClasses =
     filterStatus === "all"
@@ -135,7 +115,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard
           title="Total Teachers"
-          value={48}
+          value={dashboardData?.totalTeachers || 0}
           icon={Users}
           color="blue"
           onClick={() => navigate("/teachers")}
@@ -143,7 +123,7 @@ export function Dashboard() {
         />
         <StatCard
           title="Total Students"
-          value={1250}
+          value={dashboardData?.totalStudents || 0}
           icon={GraduationCap}
           color="teal"
           onClick={() => navigate("/students")}
@@ -151,7 +131,7 @@ export function Dashboard() {
         />
         <StatCard
           title="Active Classes"
-          value="12 Live"
+          value={`${dashboardData?.activeSessions || 0} Live`}
           icon={Radio}
           color="emerald"
           onClick={() => navigate("/live-monitoring")}
@@ -159,13 +139,13 @@ export function Dashboard() {
         />
         <StatCard
           title="Average Engagement"
-          value={78}
+          value={dashboardData?.overallEngagement || 0}
           icon={TrendingUp}
           color="amber"
           onClick={() => navigate("/reports")}
           delay={0.3}
           showProgress={true}
-          progressValue={78}
+          progressValue={dashboardData?.overallEngagement || 0}
         />
       </div>
 
@@ -210,7 +190,7 @@ export function Dashboard() {
           </div>
 
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={engagementData[timeRange]}>
+            <AreaChart data={dashboardData?.weeklyTrend || []}>
               <defs>
                 <linearGradient id="colorEngagement" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3} />

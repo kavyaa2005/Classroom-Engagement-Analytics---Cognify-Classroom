@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   Download,
@@ -20,38 +20,86 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-
-const engagementByClass = [
-  { name: "Class 8A", engagement: 92 },
-  { name: "Class 8B", engagement: 65 },
-  { name: "Class 9A", engagement: 85 },
-  { name: "Class 9B", engagement: 72 },
-  { name: "Class 10A", engagement: 78 },
-  { name: "Class 10B", engagement: 88 },
-];
-
-const engagementDistribution = [
-  { name: "High (80-100%)", value: 45, color: "#10B981" },
-  { name: "Medium (60-79%)", value: 35, color: "#F59E0B" },
-  { name: "Low (0-59%)", value: 20, color: "#EF4444" },
-];
-
-const weeklyTrend = [
-  { week: "Week 1", engagement: 68, attendance: 85 },
-  { week: "Week 2", engagement: 72, attendance: 88 },
-  { week: "Week 3", engagement: 75, attendance: 90 },
-  { week: "Week 4", engagement: 78, attendance: 92 },
-];
+import { adminAPI } from "../../services/api";
 
 export function ReportsAnalytics() {
   const [dateRange, setDateRange] = useState("last-30-days");
+  const [dashboardData, setDashboardData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchAnalyticsData();
+  }, []);
+
+  const fetchAnalyticsData = async () => {
+    try {
+      const response = await adminAPI.getDashboard();
+      if (response.data.success) {
+        setDashboardData(response.data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch analytics data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  const engagementByClass = dashboardData?.classrooms.map((c: any) => ({
+    name: `${c.name} ${c.section || ""}`.trim(),
+    engagement: c.avgEngagement,
+    sessionCount: c.sessionCount,
+  })) || [];
+
+  const totalSessions = engagementByClass.reduce((sum: number, c: any) => sum + c.sessionCount, 0);
+
+  // Calculate engagement distribution from classrooms
+  const highEngagement = engagementByClass.filter((c: any) => c.engagement >= 80).length;
+  const mediumEngagement = engagementByClass.filter((c: any) => c.engagement >= 60 && c.engagement < 80).length;
+  const lowEngagement = engagementByClass.filter((c: any) => c.engagement < 60).length;
+  const totalClasses = engagementByClass.length || 1;
+
+  const engagementDistribution = [
+    { 
+      name: "High (80-100%)", 
+      value: Math.round((highEngagement / totalClasses) * 100), 
+      color: "#10B981" 
+    },
+    { 
+      name: "Medium (60-79%)", 
+      value: Math.round((mediumEngagement / totalClasses) * 100), 
+      color: "#F59E0B" 
+    },
+    { 
+      name: "Low (0-59%)", 
+      value: Math.round((lowEngagement / totalClasses) * 100), 
+      color: "#EF4444" 
+    },
+  ].filter(item => item.value > 0);
+
+  const weeklyTrend = dashboardData?.weeklyTrend || [];
 
   const handleDownloadPDF = () => {
     alert("Downloading PDF report...");
   };
 
   const handleExportCSV = () => {
-    alert("Exporting CSV data...");
+    const csv = engagementByClass.map((c: any) => 
+      `${c.name},${c.engagement},${c.sessionCount}`
+    ).join("\n");
+    const blob = new Blob([`Class,Engagement,Sessions\n${csv}`], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "engagement-report.csv";
+    a.click();
   };
 
   return (
@@ -115,8 +163,8 @@ export function ReportsAnalytics() {
         >
           <TrendingUp className="w-8 h-8 mb-3" />
           <p className="text-sm opacity-90">Overall Engagement</p>
-          <p className="text-3xl font-bold mt-2">78%</p>
-          <p className="text-xs mt-2 opacity-80">↑ 12% from last period</p>
+          <p className="text-3xl font-bold mt-2">{dashboardData?.overallEngagement || 0}%</p>
+          <p className="text-xs mt-2 opacity-80">Platform-wide average</p>
         </motion.div>
 
         <motion.div
@@ -127,7 +175,7 @@ export function ReportsAnalytics() {
         >
           <BarChart3 className="w-8 h-8 mb-3" />
           <p className="text-sm opacity-90">Total Sessions</p>
-          <p className="text-3xl font-bold mt-2">248</p>
+          <p className="text-3xl font-bold mt-2">{totalSessions}</p>
           <p className="text-xs mt-2 opacity-80">Across all classes</p>
         </motion.div>
 
@@ -138,9 +186,9 @@ export function ReportsAnalytics() {
           className="bg-gradient-to-br from-[#F59E0B] to-[#D97706] rounded-xl p-6 text-white shadow-lg"
         >
           <Calendar className="w-8 h-8 mb-3" />
-          <p className="text-sm opacity-90">Avg Session Time</p>
-          <p className="text-3xl font-bold mt-2">42m</p>
-          <p className="text-xs mt-2 opacity-80">Per class session</p>
+          <p className="text-sm opacity-90">Total Classes</p>
+          <p className="text-3xl font-bold mt-2">{dashboardData?.classrooms.length || 0}</p>
+          <p className="text-xs mt-2 opacity-80">Active classrooms</p>
         </motion.div>
       </div>
 
@@ -194,7 +242,7 @@ export function ReportsAnalytics() {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, value }) => `${name}: ${value}%`}
+                label={({ name, value }: { name: string; value: number }) => `${name}: ${value}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -228,12 +276,12 @@ export function ReportsAnalytics() {
         className="bg-white rounded-2xl p-6 shadow-[0px_8px_24px_rgba(0,0,0,0.08)]"
       >
         <h2 className="text-xl font-bold text-[#1F2937] mb-4">
-          Weekly Performance Trend
+          Weekly Engagement Trend
         </h2>
         <ResponsiveContainer width="100%" height={300}>
           <BarChart data={weeklyTrend}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-            <XAxis dataKey="week" stroke="#6B7280" style={{ fontSize: "12px" }} />
+            <XAxis dataKey="date" stroke="#6B7280" style={{ fontSize: "12px" }} />
             <YAxis stroke="#6B7280" style={{ fontSize: "12px" }} />
             <Tooltip
               contentStyle={{
@@ -248,12 +296,6 @@ export function ReportsAnalytics() {
               fill="#3B82F6"
               radius={[8, 8, 0, 0]}
               name="Engagement %"
-            />
-            <Bar
-              dataKey="attendance"
-              fill="#14B8A6"
-              radius={[8, 8, 0, 0]}
-              name="Attendance %"
             />
           </BarChart>
         </ResponsiveContainer>
@@ -283,15 +325,15 @@ export function ReportsAnalytics() {
                   Sessions
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-[#6B7280]">
-                  Trend
+                  Students
                 </th>
                 <th className="text-left py-3 px-4 text-sm font-semibold text-[#6B7280]">
-                  Action
+                  Teacher
                 </th>
               </tr>
             </thead>
             <tbody>
-              {engagementByClass.map((cls, index) => (
+              {engagementByClass.map((cls: any, index: number) => (
                 <tr
                   key={index}
                   className="border-b border-gray-100 hover:bg-gray-50"
@@ -313,18 +355,13 @@ export function ReportsAnalytics() {
                     </span>
                   </td>
                   <td className="py-3 px-4 text-[#6B7280]">
-                    {Math.floor(Math.random() * 20) + 30}
+                    {cls.sessionCount}
                   </td>
-                  <td className="py-3 px-4">
-                    <span className="flex items-center gap-1 text-[#10B981]">
-                      <TrendingUp className="w-4 h-4" />
-                      +{Math.floor(Math.random() * 10) + 5}%
-                    </span>
+                  <td className="py-3 px-4 text-[#6B7280]">
+                    {dashboardData?.classrooms.find((c: any) => c.name === cls.name.split(' ')[0])?.studentCount || 0}
                   </td>
-                  <td className="py-3 px-4">
-                    <button className="text-[#3B82F6] hover:underline text-sm">
-                      View Details
-                    </button>
+                  <td className="py-3 px-4 text-[#6B7280]">
+                    {dashboardData?.classrooms.find((c: any) => c.name === cls.name.split(' ')[0])?.teacherName || "—"}
                   </td>
                 </tr>
               ))}

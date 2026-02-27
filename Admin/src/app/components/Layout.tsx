@@ -37,7 +37,8 @@ export function Layout() {
   const [showNotifications, setShowNotifications] = useState(false);
 
   const handleLogout = () => {
-    alert("Logout functionality would redirect to login page");
+    localStorage.removeItem("engageai_admin_token");
+    window.location.href = "/login";
   };
 
   return (
@@ -239,7 +240,7 @@ export function Layout() {
                         Admin User
                       </p>
                       <p className="text-sm text-[#6B7280]">
-                        admin@engageai.com
+                        admin@school.edu
                       </p>
                     </div>
                     <div className="p-2">

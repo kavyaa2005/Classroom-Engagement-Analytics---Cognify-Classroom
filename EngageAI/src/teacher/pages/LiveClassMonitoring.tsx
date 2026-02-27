@@ -72,9 +72,10 @@ export function LiveClassMonitoring() {
     name: string;
     section: string;
     subject: string;
-    students: unknown[];
+    students: { _id: string; name: string; email: string }[];
   } | null>(null);
   const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
+  const [liveStudentMap, setLiveStudentMap] = useState<Record<string, { score: number; state: string }>>({});
   const [emotions, setEmotions] = useState<EmotionBar[]>([
     { icon: Smile, label: "Engaged", value: 65, color: "#10B981" },
     { icon: Meh,   label: "Neutral", value: 25, color: "#F59E0B" },
@@ -95,7 +96,7 @@ export function LiveClassMonitoring() {
           _id: string; name: string; section: string; subject: string; students: unknown[];
         }[];
         if (classrooms && classrooms.length > 0) {
-          const cls = classrooms[0];
+          const cls = classrooms[0] as { _id: string; name: string; section: string; subject: string; students: { _id: string; name: string; email: string }[] };
           setClassroom(cls);
           const label = [cls.name, cls.section].filter(Boolean).join(" ") +
             (cls.subject ? " - " + cls.subject : "");
@@ -149,6 +150,7 @@ export function LiveClassMonitoring() {
       studentEngagements.current = {};
       studentStates.current = {};
       setTimelineData([]);
+      setLiveStudentMap({});
       lastTimelineAt.current = 0;
       setShowStartModal(false);
 
@@ -178,6 +180,12 @@ export function LiveClassMonitoring() {
         const scores = Object.values(studentEngagements.current);
         const avg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
         setCurrentEngagement(avg);
+
+        // Live per-student map for the student grid
+        setLiveStudentMap(prev => ({
+          ...prev,
+          [payload.studentId]: { score: payload.engagementPercent, state: payload.state },
+        }));
 
         // Append to timeline at most once every 10 seconds
         const now = Date.now();
@@ -228,7 +236,16 @@ export function LiveClassMonitoring() {
     setConnectedStudents(0);
     studentEngagements.current = {};
     studentStates.current = {};
+    setLiveStudentMap({});
   }, [sessionId]);
+
+  const getStateColor = (state: string) => {
+    if (state === "Attentive") return "#10B981";
+    if (state === "Neutral") return "#F59E0B";
+    if (state === "Distracted") return "#F97316";
+    if (state === "Inactive") return "#F87171";
+    return "#CBD5E1";
+  };
 
   const getEngagementColor = (engagement: number) => {
     if (engagement >= 75) return "#10B981";
@@ -400,7 +417,7 @@ export function LiveClassMonitoring() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Video & Engagement Meter */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Video Preview */}
+          {/* Student Engagement Grid */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -408,52 +425,127 @@ export function LiveClassMonitoring() {
             className="bg-white rounded-[18px] p-6"
             style={{ boxShadow: "0 12px 30px rgba(0,0,0,0.08)" }}
           >
-            <div className="relative aspect-video bg-gradient-to-br from-[#1E293B] to-[#334155] rounded-[12px] overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-white">
-                  <Activity className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-[14px] opacity-70">Camera Feed Preview</p>
-                </div>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[18px] font-semibold text-[#1E293B]">Class Roster</h2>
+                <span className="text-[12px] text-[#64748B] bg-[#F1F5F9] rounded-full px-2.5 py-0.5">
+                  {classroom?.students?.length ?? 0} students
+                </span>
               </div>
               {isMonitoring && (
                 <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="absolute top-4 left-4 px-4 py-2 bg-[#10B981] text-white rounded-full flex items-center gap-2"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#ECFDF5] rounded-full"
                 >
                   <motion.div
-                    animate={{ scale: [1, 1.3, 1] }}
+                    animate={{ scale: [1, 1.4, 1] }}
                     transition={{ duration: 1.5, repeat: Infinity }}
-                    className="w-2 h-2 bg-white rounded-full"
+                    className="w-2 h-2 bg-[#10B981] rounded-full"
                   />
-                  <span className="text-[12px] font-medium">AI Monitoring Active</span>
+                  <span className="text-[12px] font-medium text-[#059669]">AI Monitoring Active</span>
                 </motion.div>
               )}
             </div>
 
-            {/* Attention Waveform */}
+            {/* Roster grid */}
+            {(classroom?.students?.length ?? 0) > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                {(classroom?.students ?? []).map((student, idx) => {
+                  const live = liveStudentMap[student._id];
+                  const initials = student.name
+                    .split(" ")
+                    .map((w) => w[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase();
+                  const color = live ? getStateColor(live.state) : isMonitoring ? "#CBD5E1" : "#E2E8F0";
+                  const stateLabel = live ? live.state : isMonitoring ? "Connecting…" : "Ready";
+                  const score = live ? live.score : null;
+                  return (
+                    <motion.div
+                      key={student._id}
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: idx * 0.04 }}
+                      className="relative flex flex-col items-center gap-2 rounded-[14px] p-3 border-2 transition-all duration-500"
+                      style={{
+                        borderColor: color,
+                        background: live ? `${color}10` : "#F8FAFC",
+                      }}
+                    >
+                      {/* Avatar */}
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-[15px] flex-shrink-0"
+                        style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
+                      >
+                        {initials}
+                      </div>
+
+                      {/* Name */}
+                      <p className="text-[12px] font-semibold text-[#1E293B] text-center leading-tight w-full truncate">
+                        {student.name.split(" ")[0]}
+                      </p>
+
+                      {/* Score */}
+                      {score !== null ? (
+                        <motion.span
+                          key={score}
+                          initial={{ scale: 0.8 }}
+                          animate={{ scale: 1 }}
+                          className="text-[16px] font-bold"
+                          style={{ color }}
+                        >
+                          {score}%
+                        </motion.span>
+                      ) : (
+                        <span className="text-[13px] text-[#94A3B8]">—</span>
+                      )}
+
+                      {/* State badge */}
+                      <span
+                        className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                        style={{ background: `${color}20`, color }}
+                      >
+                        {stateLabel}
+                      </span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Users className="w-12 h-12 text-[#CBD5E1] mb-3" />
+                <p className="text-[15px] font-medium text-[#64748B]">No students assigned</p>
+                <p className="text-[13px] text-[#94A3B8] mt-1">Add students to your classroom to see live engagement</p>
+              </div>
+            )}
+
+            {/* Attention Waveform during monitoring */}
             {isMonitoring && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3 }}
-                className="mt-4"
+                className="mt-5 pt-4 border-t border-[#F1F5F9]"
               >
-                <div className="flex items-center gap-2 h-12">
-                  {[...Array(40)].map((_, i) => (
+                <p className="text-[11px] text-[#94A3B8] mb-2 font-medium uppercase tracking-wide">Live Signal</p>
+                <div className="flex items-center gap-[3px] h-10">
+                  {[...Array(36)].map((_, i) => (
                     <motion.div
                       key={i}
-                      className="flex-1 bg-[#2563EB] rounded-full"
+                      className="flex-1 rounded-full"
+                      style={{ backgroundColor: getEngagementColor(currentEngagement) }}
                       animate={{
                         height: [
-                          `${Math.random() * 40 + 20}%`,
-                          `${Math.random() * 40 + 20}%`,
+                          `${Math.random() * 50 + 20}%`,
+                          `${Math.random() * 50 + 20}%`,
                         ],
                       }}
                       transition={{
-                        duration: 0.5,
+                        duration: 0.6,
                         repeat: Infinity,
-                        delay: i * 0.05,
+                        delay: i * 0.04,
                       }}
                     />
                   ))}

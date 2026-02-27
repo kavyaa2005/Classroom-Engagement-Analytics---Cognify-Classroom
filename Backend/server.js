@@ -29,10 +29,21 @@ initSocket(server);
 
 // ─── Middleware ────────────────────────────────────────────────────────────────
 
-// CORS — allow the Vite frontend
+// CORS — allow Vite frontends on any localhost port
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:5173",
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
+  "http://localhost:5176",
+  "http://localhost:3000",
+];
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      callback(null, true); // allow all during development
+    },
     credentials: true,
   })
 );

@@ -19,15 +19,23 @@ interface StudentAPI {
   name: string;
   email: string;
   isActive: boolean;
-  classrooms: { _id: string; name: string }[];
+  classroomId?: { _id: string; name: string };
+  avgEngagement?: number;
+  attendanceRate?: number;
 }
 interface StudentsData {
   students: StudentAPI[];
 }
 
 function deriveRisk(s: StudentAPI): "Low" | "Medium" | "High" {
-  // Heuristic: if no classrooms assigned → high risk
-  if (!s.classrooms || s.classrooms.length === 0) return "High";
+  const engagement = s.avgEngagement ?? 0;
+  const attendance = s.attendanceRate ?? 0;
+  
+  // High risk: low engagement (<50%) OR low attendance (<60%)
+  if (engagement < 50 || attendance < 60) return "High";
+  // Medium risk: moderate engagement (50-70%) OR moderate attendance (60-80%)
+  if (engagement < 70 || attendance < 80) return "Medium";
+  // Low risk: good performance
   return "Low";
 }
 
@@ -45,9 +53,9 @@ export function ManageStudents() {
     name: s.name,
     email: s.email,
     isActive: s.isActive,
-    class: s.classrooms?.[0]?.name ?? "Unassigned",
-    engagement: 0, // not returned by list endpoint
-    attendance: s.isActive ? 90 : 60,
+    class: s.classroomId?.name ?? "Unassigned",
+    engagement: s.avgEngagement ?? 0,
+    attendance: s.attendanceRate ??  0,
     risk: deriveRisk(s),
   }));
 

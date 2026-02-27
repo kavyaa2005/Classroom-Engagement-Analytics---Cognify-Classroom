@@ -9,21 +9,31 @@ import { AIModelStatus } from "./pages/AIModelStatus";
 import { Notifications } from "./pages/Notifications";
 import { Settings } from "./pages/Settings";
 import { PrivacyCompliance } from "./pages/PrivacyCompliance";
+import { LoginPage } from "./pages/LoginPage";
+import { RegisterPage } from "./pages/RegisterPage";
+import { ProtectedRoute } from "../auth/ProtectedRoute";
 
 export const router = createBrowserRouter([
+  { path: "/login", Component: LoginPage },
+  { path: "/register", Component: RegisterPage },
   {
     path: "/",
-    Component: Layout,
+    Component: ProtectedRoute,
     children: [
-      { index: true, Component: Dashboard },
-      { path: "teachers", Component: ManageTeachers },
-      { path: "students", Component: ManageStudents },
-      { path: "live-monitoring", Component: LiveMonitoring },
-      { path: "reports", Component: ReportsAnalytics },
-      { path: "ai-model", Component: AIModelStatus },
-      { path: "notifications", Component: Notifications },
-      { path: "settings", Component: Settings },
-      { path: "privacy", Component: PrivacyCompliance },
+      {
+        Component: Layout,
+        children: [
+          { index: true, Component: Dashboard },
+          { path: "teachers", Component: ManageTeachers },
+          { path: "students", Component: ManageStudents },
+          { path: "live-monitoring", Component: LiveMonitoring },
+          { path: "reports", Component: ReportsAnalytics },
+          { path: "ai-model", Component: AIModelStatus },
+          { path: "notifications", Component: Notifications },
+          { path: "settings", Component: Settings },
+          { path: "privacy", Component: PrivacyCompliance },
+        ],
+      },
     ],
   },
 ]);

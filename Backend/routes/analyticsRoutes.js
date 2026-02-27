@@ -9,6 +9,7 @@ const {
   getAdminDashboard,
   getSessionHistory,
   getStudentClassInsights,
+  getAIStatus,
 } = require("../controllers/analyticsController");
 const { protect, authorize } = require("../middleware/authMiddleware");
 
@@ -20,6 +21,9 @@ router.get("/dashboard/student/class-insights", protect, authorize("student"), g
 
 // Session history (teacher or student)
 router.get("/history", protect, authorize("teacher", "student"), getSessionHistory);
+
+// AI model status (admin)
+router.get("/ai-status", protect, authorize("admin"), getAIStatus);
 
 // Detailed analytics
 router.get("/session/:id", protect, authorize("teacher", "admin"), getSessionAnalytics);

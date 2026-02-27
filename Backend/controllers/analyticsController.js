@@ -739,6 +739,52 @@ const getStudentClassInsights = async (req, res, next) => {
   }
 };
 
+// ─── GET /api/analytics/ai-status ─────────────────────────────────────────────
+/**
+ * AI Model status: pings AI service + returns prediction stats from MongoDB.
+ * Auth: admin
+ */
+const getAIStatus = async (req, res, next) => {
+  try {
+    const AI_URL = process.env.AI_SERVICE_URL || "http://localhost:8001";
+
+    // Ping AI service health endpoint
+    let aiHealth = { status: "offline", loaded: false, model: "N/A", timestamp: null };
+    try {
+      const nodeFetch = require("node-fetch");
+      const r = await nodeFetch(`${AI_URL}/health`, { timeout: 4000 });
+      if (r.ok) aiHealth = await r.json();
+    } catch (_) {
+      // AI service unreachable — return offline status
+    }
+
+    // Stats from MongoDB
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const [totalPredictions, todayPredictions, activeSessions] = await Promise.all([
+      EngagementRecord.countDocuments(),
+      EngagementRecord.countDocuments({ timestamp: { $gte: todayStart } }),
+      Session.countDocuments({ status: "active" }),
+    ]);
+
+    return sendSuccess(res, 200, "AI status fetched.", {
+      aiService: {
+        status: aiHealth.status === "ok" ? "online" : "offline",
+        loaded: aiHealth.loaded ?? false,
+        model: aiHealth.model ?? "N/A",
+        timestamp: aiHealth.timestamp ?? null,
+      },
+      stats: {
+        totalPredictions,
+        todayPredictions,
+        activeSessions,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getSessionAnalytics,
   getStudentAnalytics,
@@ -748,4 +794,5 @@ module.exports = {
   getAdminDashboard,
   getSessionHistory,
   getStudentClassInsights,
+  getAIStatus,
 };

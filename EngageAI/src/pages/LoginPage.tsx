@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { Link } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Brain, ShieldCheck, GraduationCap, Users, Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth, UserRole } from "../auth/AuthContext";
@@ -45,7 +45,6 @@ const roles = [
 ];
 
 export function LoginPage() {
-    const navigate = useNavigate();
     const { login } = useAuth();
     const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
     const [email, setEmail] = useState("");
@@ -68,7 +67,8 @@ export function LoginPage() {
             });
             const { token, user } = data.data;
             login(user.role, user.name, user.email, token, user._id);
-            navigate(`/${selectedRole}`);
+            // Hard redirect — ProtectedRoute reads localStorage directly so no race
+            window.location.replace(`/${user.role}`);
         } catch (err: unknown) {
             const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
             setError(msg || "Login failed. Check your credentials and try again.");

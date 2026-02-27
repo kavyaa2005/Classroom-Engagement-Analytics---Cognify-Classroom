@@ -27,11 +27,11 @@ export function AIModelStatus() {
   const checkAIHealth = async () => {
     const start = Date.now();
     try {
-      const res = await fetch("http://localhost:8000/");
+      const res = await fetch("http://localhost:8001/health");
       const json = await res.json();
       setAiHealth(json);
       setAiLatencyMs(Date.now() - start);
-      setIsMonitoringActive(json.status === "ok" || json.status === "running");
+      setIsMonitoringActive(json.status === "ok" || json.loaded === true);
       setAiError(false);
     } catch {
       setAiError(true);
@@ -54,8 +54,7 @@ export function AIModelStatus() {
     alert("AI Model restart request sent. Please restart the AIService manually if needed.");
   };
 
-  const modelVersion = aiHealth?.version ?? aiHealth?.model ?? (aiError ? "Offline" : "—");
-  const accuracyDisplay = aiError ? "N/A" : "94.8%";
+  const modelVersion = aiError ? "Offline" : (aiHealth?.model ?? "engagement_model_v3");
   const latencyDisplay = aiLatencyMs != null ? `${aiLatencyMs}ms` : "—";
 
   return (
@@ -88,9 +87,9 @@ export function AIModelStatus() {
           className="bg-gradient-to-br from-[#3B82F6] to-[#2563EB] rounded-xl p-6 text-white shadow-lg"
         >
           <Brain className="w-10 h-10 mb-3" />
-          <p className="text-sm opacity-90">Model Version</p>
-          <p className="text-2xl font-bold mt-2">{modelVersion}</p>
-          <p className="text-xs mt-2 opacity-80">Latest stable release</p>
+          <p className="text-sm opacity-90">Model</p>
+          <p className="text-lg font-bold mt-2 leading-tight">{modelVersion}</p>
+          <p className="text-xs mt-2 opacity-80">EfficientNet-B0 · 2 classes</p>
         </motion.div>
 
         <motion.div
@@ -100,9 +99,9 @@ export function AIModelStatus() {
           className="bg-gradient-to-br from-[#10B981] to-[#059669] rounded-xl p-6 text-white shadow-lg"
         >
           <Activity className="w-10 h-10 mb-3" />
-          <p className="text-sm opacity-90">Accuracy Score</p>
-          <p className="text-2xl font-bold mt-2">{accuracyDisplay}</p>
-          <p className="text-xs mt-2 opacity-80">↑ 2.3% this month</p>
+          <p className="text-sm opacity-90">Input Resolution</p>
+          <p className="text-2xl font-bold mt-2">224×224</p>
+          <p className="text-xs mt-2 opacity-80">RGB · ImageNet normalisation</p>
         </motion.div>
 
         <motion.div
@@ -112,9 +111,9 @@ export function AIModelStatus() {
           className="bg-gradient-to-br from-[#14B8A6] to-[#0D9488] rounded-xl p-6 text-white shadow-lg"
         >
           <Zap className="w-10 h-10 mb-3" />
-          <p className="text-sm opacity-90">Response Time</p>
+          <p className="text-sm opacity-90">Response Latency</p>
           <p className="text-2xl font-bold mt-2">{latencyDisplay}</p>
-          <p className="text-xs mt-2 opacity-80">Average latency</p>
+          <p className="text-xs mt-2 opacity-80">Live ping to AI service</p>
         </motion.div>
 
         <motion.div
@@ -196,22 +195,20 @@ export function AIModelStatus() {
           className="bg-white rounded-2xl p-6 shadow-[0px_8px_24px_rgba(0,0,0,0.08)]"
         >
           <h2 className="text-xl font-bold text-[#1F2937] mb-4">
-            Performance Metrics
+            Engagement Thresholds
           </h2>
 
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[#6B7280]">
-                  Detection Accuracy
-                </span>
-                <span className="text-sm font-bold text-[#1F2937]">{accuracyDisplay}</span>
+                <span className="text-sm text-[#6B7280]">Attentive</span>
+                <span className="text-sm font-bold text-[#1F2937]">score ≥ 0.70</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-gradient-to-r from-[#10B981] to-[#14B8A6]"
                   initial={{ width: 0 }}
-                  animate={{ width: aiError ? "0%" : (aiHealth?.accuracy ? `${aiHealth.accuracy}%` : "94.8%") }}
+                  animate={{ width: "70%" }}
                   transition={{ duration: 1, delay: 0.6 }}
                 />
               </div>
@@ -219,14 +216,14 @@ export function AIModelStatus() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[#6B7280]">Model Confidence</span>
-                <span className="text-sm font-bold text-[#1F2937]">{accuracyDisplay}</span>
+                <span className="text-sm text-[#6B7280]">Neutral</span>
+                <span className="text-sm font-bold text-[#1F2937]">score ≥ 0.40</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-gradient-to-r from-[#3B82F6] to-[#2563EB]"
                   initial={{ width: 0 }}
-                  animate={{ width: "91.2%" }}
+                  animate={{ width: "40%" }}
                   transition={{ duration: 1, delay: 0.7 }}
                 />
               </div>
@@ -234,16 +231,14 @@ export function AIModelStatus() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[#6B7280]">Processing Speed</span>
-                <span className="text-sm font-bold text-[#1F2937]">
-                  120ms avg
-                </span>
+                <span className="text-sm text-[#6B7280]">Distracted</span>
+                <span className="text-sm font-bold text-[#1F2937]">score ≥ 0.15</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-[#14B8A6] to-[#0D9488]"
+                  className="h-full bg-gradient-to-r from-[#F59E0B] to-[#D97706]"
                   initial={{ width: 0 }}
-                  animate={{ width: "88%" }}
+                  animate={{ width: "15%" }}
                   transition={{ duration: 1, delay: 0.8 }}
                 />
               </div>
@@ -251,14 +246,14 @@ export function AIModelStatus() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-[#6B7280]">Uptime</span>
-                <span className="text-sm font-bold text-[#1F2937]">99.7%</span>
+                <span className="text-sm text-[#6B7280]">Confidence Floor</span>
+                <span className="text-sm font-bold text-[#1F2937]">0.38 minimum</span>
               </div>
               <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-[#F59E0B] to-[#D97706]"
+                  className="h-full bg-gradient-to-r from-[#EF4444] to-[#DC2626]"
                   initial={{ width: 0 }}
-                  animate={{ width: "99.7%" }}
+                  animate={{ width: "38%" }}
                   transition={{ duration: 1, delay: 0.9 }}
                 />
               </div>
@@ -285,7 +280,7 @@ export function AIModelStatus() {
                   Model Architecture
                 </p>
                 <p className="text-xs text-[#6B7280]">
-                  CNN + Transformer Hybrid
+                  EfficientNet-B0 (timm / PyTorch)
                 </p>
               </div>
             </div>
@@ -294,10 +289,10 @@ export function AIModelStatus() {
               <Activity className="w-5 h-5 text-[#10B981]" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-[#1F2937]">
-                  Last Updated
+                  Model Checkpoint
                 </p>
                 <p className="text-xs text-[#6B7280]">
-                  February 15, 2026 - 14:32 UTC
+                  engagement_model_v3.pth
                 </p>
               </div>
             </div>
@@ -306,10 +301,10 @@ export function AIModelStatus() {
               <TrendingUp className="w-5 h-5 text-[#14B8A6]" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-[#1F2937]">
-                  Training Dataset
+                  Output Classes
                 </p>
                 <p className="text-xs text-[#6B7280]">
-                  2.4M labeled images, 15K hours
+                  2 classes (Engaged / Not Engaged) → 4 states
                 </p>
               </div>
             </div>
@@ -318,9 +313,9 @@ export function AIModelStatus() {
               <Zap className="w-5 h-5 text-[#F59E0B]" />
               <div className="flex-1">
                 <p className="text-sm font-medium text-[#1F2937]">
-                  Compute Resources
+                  Face Detection
                 </p>
-                <p className="text-xs text-[#6B7280]">4x NVIDIA A100 GPUs</p>
+                <p className="text-xs text-[#6B7280]">OpenCV Haar Cascade · min size 48×48</p>
               </div>
             </div>
           </div>
@@ -341,24 +336,24 @@ export function AIModelStatus() {
         <div className="space-y-3">
           {[
             {
-              time: "10:45 AM",
-              event: `Model accuracy: ${accuracyDisplay}`,  
-              type: "success",
+              time: "Startup",
+              event: `AI service health check: ${aiError ? "OFFLINE — start uvicorn on port 8001" : "OK · model loaded"}`,
+              type: aiError ? "warning" : "success",
             },
             {
-              time: "09:30 AM",
-              event: "Processed 1,250 student frames",
+              time: "Config",
+              event: "Model: engagement_model_v3.pth · Architecture: EfficientNet-B0",
               type: "info",
             },
             {
-              time: "08:15 AM",
-              event: "System health check completed",
-              type: "success",
+              time: "Config",
+              event: "Input: 224×224 RGB · ImageNet normalisation (mean/std)",
+              type: "info",
             },
             {
-              time: "07:00 AM",
-              event: "Routine model optimization started",
-              type: "warning",
+              time: "Config",
+              event: "Face detector: OpenCV Haar Cascade · Confidence floor: 0.38",
+              type: "info",
             },
           ].map((log, index) => (
             <motion.div

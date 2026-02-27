@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   UserPlus,
@@ -10,113 +10,118 @@ import {
   X,
   Mail,
   BookOpen,
+  Trash,
 } from "lucide-react";
+import { adminAPI } from "../../services/api";
 
 interface Teacher {
-  id: number;
+  _id: string;
   name: string;
   email: string;
-  classes: string[];
-  performance: number;
-  status: "Active" | "Inactive";
+  classes: Array<{ _id: string; name: string; section?: string; subject?: string }>;
+  subject?: string;
+  isActive: boolean;
 }
 
-const teachersData: Teacher[] = [
-  {
-    id: 1,
-    name: "Sarah Johnson",
-    email: "sarah.johnson@school.edu",
-    classes: ["Class 8A", "Class 9A"],
-    performance: 92,
-    status: "Active",
-  },
-  {
-    id: 2,
-    name: "Michael Chen",
-    email: "michael.chen@school.edu",
-    classes: ["Class 8B"],
-    performance: 78,
-    status: "Active",
-  },
-  {
-    id: 3,
-    name: "Emily Davis",
-    email: "emily.davis@school.edu",
-    classes: ["Class 9B", "Class 10A"],
-    performance: 88,
-    status: "Active",
-  },
-  {
-    id: 4,
-    name: "Robert Smith",
-    email: "robert.smith@school.edu",
-    classes: ["Class 9C"],
-    performance: 65,
-    status: "Inactive",
-  },
-  {
-    id: 5,
-    name: "Lisa Anderson",
-    email: "lisa.anderson@school.edu",
-    classes: ["Class 10B", "Class 10C"],
-    performance: 85,
-    status: "Active",
-  },
-];
-
 export function ManageTeachers() {
-  const [teachers, setTeachers] = useState<Teacher[]>(teachersData);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "Active" | "Inactive">(
-    "all"
-  );
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "inactive">("all");
+  const [loading, setLoading] = useState(true);
   const [newTeacher, setNewTeacher] = useState({
     name: "",
     email: "",
-    classes: "",
+    password: "",
+    subject: "",
   });
+
+  useEffect(() => {
+    fetchTeachers();
+  }, []);
+
+  const fetchTeachers = async () => {
+    try {
+      const response = await adminAPI.getTeachers();
+      if (response.data.success) {
+        setTeachers(response.data.data.teachers);
+      }
+    } catch (error) {
+      console.error("Failed to fetch teachers:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredTeachers = teachers.filter((teacher) => {
     const matchesSearch =
       teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       teacher.email.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter =
-      filterStatus === "all" || teacher.status === filterStatus;
+      filterStatus === "all" ||
+      (filterStatus === "active" && teacher.isActive) ||
+      (filterStatus === "inactive" && !teacher.isActive);
     return matchesSearch && matchesFilter;
   });
 
-  const handleAddTeacher = () => {
-    if (newTeacher.name && newTeacher.email) {
-      const teacher: Teacher = {
-        id: teachers.length + 1,
-        name: newTeacher.name,
-        email: newTeacher.email,
-        classes: newTeacher.classes.split(",").map((c) => c.trim()),
-        performance: 0,
-        status: "Active",
-      };
-      setTeachers([...teachers, teacher]);
-      setShowModal(false);
-      setNewTeacher({ name: "", email: "", classes: "" });
+  const handleAddTeacher = async () => {
+    if (newTeacher.name && newTeacher.email && newTeacher.password) {
+      try {
+        const response = await adminAPI.createTeacher(newTeacher);
+        if (response.data.success) {
+          await fetchTeachers();
+          setShowModal(false);
+          setNewTeacher({ name: "", email: "", password: "", subject: "" });
+        }
+      } catch (error: any) {
+        alert(error.response?.data?.message || "Failed to create teacher");
+      }
+    } else {
+      alert("Please fill in all required fields");
     }
   };
 
-  const handleDeactivate = (id: number) => {
+  const handleToggleActive = async (teacherId: string) => {
+    const teacher = teachers.find((t) => t._id === teacherId);
+    const action = teacher?.isActive ? "deactivate" : "activate";
     const confirmed = window.confirm(
-      "Are you sure you want to deactivate this teacher?"
+      `Are you sure you want to ${action} this teacher?`
     );
     if (confirmed) {
-      setTeachers(
-        teachers.map((t) =>
-          t.id === id ? { ...t, status: "Inactive" as const } : t
-        )
-      );
+      try {
+        await adminAPI.toggleUser(teacherId);
+        await fetchTeachers();
+      } catch (error) {
+        console.error("Failed to toggle teacher status:", error);
+      }
     }
   };
 
+  const handleDelete = async (teacherId: string) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this teacher? This action cannot be undone."
+    );
+    if (confirmed) {
+      try {
+        await adminAPI.deleteUser(teacherId);
+        await fetchTeachers();
+      } catch (error) {
+        console.error("Failed to delete teacher:", error);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -157,7 +162,7 @@ export function ManageTeachers() {
         >
           <p className="text-sm text-[#6B7280]">Active</p>
           <p className="text-2xl font-bold text-[#10B981] mt-1">
-            {teachers.filter((t) => t.status === "Active").length}
+            {teachers.filter((t) => t.isActive).length}
           </p>
         </motion.div>
         <motion.div
@@ -166,13 +171,9 @@ export function ManageTeachers() {
           transition={{ delay: 0.2 }}
           className="bg-white rounded-xl p-4 shadow-md"
         >
-          <p className="text-sm text-[#6B7280]">Average Performance</p>
+          <p className="text-sm text-[#6B7280]">Total Classes</p>
           <p className="text-2xl font-bold text-[#3B82F6] mt-1">
-            {Math.round(
-              teachers.reduce((sum, t) => sum + t.performance, 0) /
-                teachers.length
-            )}
-            %
+            {teachers.reduce((sum, t) => sum + t.classes.length, 0)}
           </p>
         </motion.div>
       </div>
@@ -193,13 +194,13 @@ export function ManageTeachers() {
           <select
             value={filterStatus}
             onChange={(e) =>
-              setFilterStatus(e.target.value as "all" | "Active" | "Inactive")
+              setFilterStatus(e.target.value as "all" | "active" | "inactive")
             }
             className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
           >
             <option value="all">All Status</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
       </div>
@@ -231,6 +232,9 @@ export function ManageTeachers() {
                   Status
                 </th>
                 <th className="text-left py-4 px-6 text-sm font-semibold text-[#6B7280]">
+                  Status
+                </th>
+                <th className="text-left py-4 px-6 text-sm font-semibold text-[#6B7280]">
                   Actions
                 </th>
               </tr>
@@ -238,7 +242,7 @@ export function ManageTeachers() {
             <tbody>
               {filteredTeachers.map((teacher, index) => (
                 <motion.tr
-                  key={teacher.id}
+                  key={teacher._id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + index * 0.05 }}
@@ -257,38 +261,30 @@ export function ManageTeachers() {
                   <td className="py-4 px-6 text-[#6B7280]">{teacher.email}</td>
                   <td className="py-4 px-6">
                     <div className="flex flex-wrap gap-1">
-                      {teacher.classes.map((cls, idx) => (
-                        <span
-                          key={idx}
-                          className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs"
-                        >
-                          {cls}
-                        </span>
-                      ))}
+                      {teacher.classes.length > 0 ? (
+                        teacher.classes.map((cls, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs"
+                          >
+                            {cls.name} {cls.section || ""}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-gray-400">No classes</span>
+                      )}
                     </div>
                   </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
-                        <div
-                          className="bg-gradient-to-r from-[#10B981] to-[#14B8A6] h-2 rounded-full"
-                          style={{ width: `${teacher.performance}%` }}
-                        />
-                      </div>
-                      <span className="text-sm font-medium text-[#1F2937]">
-                        {teacher.performance}%
-                      </span>
-                    </div>
-                  </td>
+                  <td className="py-4 px-6 text-[#6B7280]">{teacher.subject || "—"}</td>
                   <td className="py-4 px-6">
                     <span
                       className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        teacher.status === "Active"
+                        teacher.isActive
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {teacher.status}
+                      {teacher.isActive ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="py-4 px-6">
@@ -296,27 +292,20 @@ export function ManageTeachers() {
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="p-2 text-[#3B82F6] hover:bg-blue-50 rounded-lg transition-all"
-                        title="View"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                        onClick={() => handleToggleActive(teacher._id)}
                         className="p-2 text-[#14B8A6] hover:bg-teal-50 rounded-lg transition-all"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => handleDeactivate(teacher.id)}
-                        className="p-2 text-[#EF4444] hover:bg-red-50 rounded-lg transition-all"
-                        title="Deactivate"
+                        title={teacher.isActive ? "Deactivate" : "Activate"}
                       >
                         <UserX className="w-4 h-4" />
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => handleDelete(teacher._id)}
+                        className="p-2 text-[#EF4444] hover:bg-red-50 rounded-lg transition-all"
+                        title="Delete"
+                      >
+                        <Trash className="w-4 h-4" />
                       </motion.button>
                     </div>
                   </td>
@@ -410,15 +399,42 @@ export function ManageTeachers() {
                     />
                   </div>
                 </div>
-              </div>
 
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-xl hover:bg-gray-50 transition-all"
-                >
-                  Cancel
-                </button>
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2937] mb-2">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newTeacher.password}
+                    onChange={(e) =>
+                      setNewTeacher({ ...newTeacher, password: e.target.value })
+                    }
+                    placeholder="Enter password"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[#1F2937] mb-2">
+                    Subject (optional)
+                  </label>
+                  <div className="relative">
+                    <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[#6B7280]" />
+                    <input
+                      type="text"
+                      value={newTeacher.subject}
+                      onChange={(e) =>
+                        setNewTeacher({
+                          ...newTeacher,
+                          subject: e.target.value,
+                        })
+                      }
+                      placeholder="Mathematics, Science, etc."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
+                    />
+                  </div>
+                </div>
                 <button
                   onClick={handleAddTeacher}
                   className="flex-1 px-4 py-2 bg-[#3B82F6] text-white rounded-xl hover:bg-[#2563EB] transition-all"
@@ -430,6 +446,7 @@ export function ManageTeachers() {
           </>
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </>
   );
 }

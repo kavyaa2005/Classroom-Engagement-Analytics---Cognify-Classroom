@@ -1,83 +1,53 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { Radio, Users, Eye, AlertTriangle, TrendingUp } from "lucide-react";
+import { adminAPI } from "../../services/api";
 
 interface LiveClass {
-  id: number;
+  id: string;
   name: string;
   teacher: string;
+  subject: string;
   students: number;
   engagement: number;
   status: "Excellent" | "Good" | "Needs Attention";
   activeNow: number;
+  startTime: Date;
 }
 
-const liveClassesData: LiveClass[] = [
-  {
-    id: 1,
-    name: "Class 8A - Mathematics",
-    teacher: "Sarah Johnson",
-    students: 32,
-    engagement: 92,
-    status: "Excellent",
-    activeNow: 30,
-  },
-  {
-    id: 2,
-    name: "Class 8B - Science",
-    teacher: "Michael Chen",
-    students: 28,
-    engagement: 48,
-    status: "Needs Attention",
-    activeNow: 15,
-  },
-  {
-    id: 3,
-    name: "Class 9A - English",
-    teacher: "Emily Davis",
-    students: 30,
-    engagement: 85,
-    status: "Excellent",
-    activeNow: 28,
-  },
-  {
-    id: 4,
-    name: "Class 9B - History",
-    teacher: "Robert Smith",
-    students: 25,
-    engagement: 65,
-    status: "Good",
-    activeNow: 20,
-  },
-];
-
 export function LiveMonitoring() {
-  const [liveClasses, setLiveClasses] = useState<LiveClass[]>(liveClassesData);
+  const [liveClasses, setLiveClasses] = useState<LiveClass[]>([]);
   const [selectedClass, setSelectedClass] = useState<LiveClass | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Simulate live data updates
+  // Fetch live sessions every 3 seconds
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLiveClasses((prev) =>
-        prev.map((cls) => ({
-          ...cls,
-          engagement: Math.max(
-            30,
-            Math.min(100, cls.engagement + (Math.random() - 0.5) * 5)
-          ),
-          activeNow: Math.max(
-            10,
-            Math.min(
-              cls.students,
-              cls.activeNow + Math.floor((Math.random() - 0.5) * 3)
-            )
-          ),
-        }))
-      );
-    }, 3000);
+    const fetchLiveSessions = async () => {
+      try {
+        const response = await adminAPI.getLiveSessions();
+        if (response.data.success) {
+          setLiveClasses(response.data.data.sessions);
+        }
+      } catch (error) {
+        console.error("Failed to fetch live sessions:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLiveSessions();
+    const interval = setInterval(fetchLiveSessions, 3000);
 
     return () => clearInterval(interval);
   }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -132,10 +102,12 @@ export function LiveMonitoring() {
         >
           <p className="text-sm text-[#6B7280]">Avg Engagement</p>
           <p className="text-2xl font-bold text-[#14B8A6] mt-1">
-            {Math.round(
-              liveClasses.reduce((sum, cls) => sum + cls.engagement, 0) /
-                liveClasses.length
-            )}
+            {liveClasses.length > 0 
+              ? Math.round(
+                  liveClasses.reduce((sum, cls) => sum + cls.engagement, 0) /
+                    liveClasses.length
+                )
+              : 0}
             %
           </p>
         </motion.div>
@@ -155,6 +127,23 @@ export function LiveMonitoring() {
           </p>
         </motion.div>
       </div>
+
+      {/* No Live Classes Message */}
+      {liveClasses.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-2xl p-12 text-center shadow-md"
+        >
+          <Radio className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-[#1F2937] mb-2">
+            No Live Classes
+          </h3>
+          <p className="text-[#6B7280]">
+            There are currently no active classroom sessions
+          </p>
+        </motion.div>
+      )}
 
       {/* Live Classes Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

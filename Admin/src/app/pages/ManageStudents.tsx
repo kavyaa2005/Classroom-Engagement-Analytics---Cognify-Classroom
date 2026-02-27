@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import {
   Search,
@@ -11,107 +11,86 @@ import {
   Download,
 } from "lucide-react";
 import { useNavigate } from "react-router";
+import { adminAPI } from "../../services/api";
 
 interface Student {
-  id: number;
+  _id: string;
   name: string;
-  class: string;
-  engagement: number;
-  attendance: number;
-  risk: "Low" | "Medium" | "High";
+  email: string;
+  rollNumber?: string;
+  classroomId?: {
+    _id: string;
+    name: string;
+    section?: string;
+    subject?: string;
+  };
+  avgEngagement: number;
+  attendanceRate: number;
+  isActive: boolean;
 }
-
-const studentsData: Student[] = [
-  {
-    id: 1,
-    name: "Emma Wilson",
-    class: "Class 8A",
-    engagement: 92,
-    attendance: 98,
-    risk: "Low",
-  },
-  {
-    id: 2,
-    name: "James Brown",
-    class: "Class 8B",
-    engagement: 45,
-    attendance: 72,
-    risk: "High",
-  },
-  {
-    id: 3,
-    name: "Sophia Martinez",
-    class: "Class 9A",
-    engagement: 88,
-    attendance: 95,
-    risk: "Low",
-  },
-  {
-    id: 4,
-    name: "Oliver Davis",
-    class: "Class 9B",
-    engagement: 65,
-    attendance: 85,
-    risk: "Medium",
-  },
-  {
-    id: 5,
-    name: "Ava Garcia",
-    class: "Class 10A",
-    engagement: 78,
-    attendance: 90,
-    risk: "Low",
-  },
-  {
-    id: 6,
-    name: "Liam Johnson",
-    class: "Class 8A",
-    engagement: 55,
-    attendance: 68,
-    risk: "High",
-  },
-  {
-    id: 7,
-    name: "Isabella Lee",
-    class: "Class 9B",
-    engagement: 82,
-    attendance: 92,
-    risk: "Low",
-  },
-  {
-    id: 8,
-    name: "Noah Anderson",
-    class: "Class 10B",
-    engagement: 70,
-    attendance: 88,
-    risk: "Medium",
-  },
-];
 
 export function ManageStudents() {
   const navigate = useNavigate();
-  const [students] = useState<Student[]>(studentsData);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterRisk, setFilterRisk] = useState<"all" | "Low" | "Medium" | "High">(
-    "all"
-  );
+  const [filterRisk, setFilterRisk] = useState<"all" | "Low" | "Medium" | "High">("all");
   const [filterClass, setFilterClass] = useState("all");
 
+  useEffect(() => {
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    try {
+      const response = await adminAPI.getStudents();
+      if (response.data.success) {
+        setStudents(response.data.data.students);
+      }
+    } catch (error) {
+      console.error("Failed to fetch students:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getRiskLevel = (engagement: number): "Low" | "Medium" | "High" => {
+    if (engagement >= 70) return "Low";
+    if (engagement >= 50) return "Medium";
+    return "High";
+  };
+
   const filteredStudents = students.filter((student) => {
-    const matchesSearch = student.name
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase());
-    const matchesRisk = filterRisk === "all" || student.risk === filterRisk;
-    const matchesClass =
-      filterClass === "all" || student.class === filterClass;
+    const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const risk = getRiskLevel(student.avgEngagement);
+    const matchesRisk = filterRisk === "all" || risk === filterRisk;
+    const className = student.classroomId ? `${student.classroomId.name} ${student.classroomId.section || ""}`.trim() : "No Class";
+    const matchesClass = filterClass === "all" || className === filterClass;
     return matchesSearch && matchesRisk && matchesClass;
   });
 
-  const avgEngagement = Math.round(
-    students.reduce((sum, s) => sum + s.engagement, 0) / students.length
-  );
+  const avgEngagement = students.length > 0
+    ? Math.round(students.reduce((sum, s) => sum + s.avgEngagement, 0) / students.length)
+    : 0;
 
-  const atRiskCount = students.filter((s) => s.risk === "High").length;
+  const avgAttendance = students.length > 0
+    ? Math.round(students.reduce((sum, s) => sum + s.attendanceRate, 0) / students.length)
+    : 0;
+
+  const atRiskCount = students.filter((s) => getRiskLevel(s.avgEngagement) === "High").length;
+
+  const uniqueClasses = [...new Set(students.map((s) => 
+    s.classroomId ? `${s.classroomId.name} ${s.classroomId.section || ""}`.trim() : "No Class"
+  ))];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -133,7 +112,7 @@ export function ManageStudents() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[#6B7280]">Total Students</p>
-              <p className="text-2xl font-bold text-[#1F2937] mt-1">1,250</p>
+              <p className="text-2xl font-bold text-[#1F2937] mt-1">{students.length}</p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-[#3B82F6]" />
@@ -188,7 +167,7 @@ export function ManageStudents() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-[#6B7280]">Avg Attendance</p>
-              <p className="text-2xl font-bold text-[#14B8A6] mt-1">87%</p>
+              <p className="text-2xl font-bold text-[#14B8A6] mt-1">{avgAttendance}%</p>
             </div>
             <div className="w-12 h-12 bg-teal-100 rounded-xl flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-[#14B8A6]" />
@@ -217,12 +196,9 @@ export function ManageStudents() {
             className="px-4 py-2 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B82F6]"
           >
             <option value="all">All Classes</option>
-            <option value="Class 8A">Class 8A</option>
-            <option value="Class 8B">Class 8B</option>
-            <option value="Class 9A">Class 9A</option>
-            <option value="Class 9B">Class 9B</option>
-            <option value="Class 10A">Class 10A</option>
-            <option value="Class 10B">Class 10B</option>
+            {uniqueClasses.map((cls) => (
+              <option key={cls} value={cls}>{cls}</option>
+            ))}
           </select>
 
           <select
@@ -281,108 +257,120 @@ export function ManageStudents() {
               </tr>
             </thead>
             <tbody>
-              {filteredStudents.map((student, index) => (
-                <motion.tr
-                  key={student.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 + index * 0.05 }}
-                  onClick={() => alert(`View details for ${student.name}`)}
-                  className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-all"
-                >
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-[#3B82F6] to-[#14B8A6] rounded-full flex items-center justify-center text-white font-medium text-sm">
-                        {student.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
+              {filteredStudents.map((student, index) => {
+                const risk = getRiskLevel(student.avgEngagement);
+                const className = student.classroomId 
+                  ? `${student.classroomId.name} ${student.classroomId.section || ""}`.trim() 
+                  : "No Class";
+                
+                return (
+                  <motion.tr
+                    key={student._id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 + index * 0.05 }}
+                    onClick={() => alert(`View details for ${student.name}`)}
+                    className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-all"
+                  >
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-[#3B82F6] to-[#14B8A6] rounded-full flex items-center justify-center text-white font-medium text-sm">
+                          {student.name
+                            .split(" ")
+                            .map((n) => n[0])
+                            .join("")}
+                        </div>
+                        <div>
+                          <div className="font-medium text-[#1F2937]">
+                            {student.name}
+                          </div>
+                          <div className="text-xs text-[#6B7280]">
+                            {student.rollNumber || student.email}
+                          </div>
+                        </div>
                       </div>
-                      <span className="font-medium text-[#1F2937]">
-                        {student.name}
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm">
+                        {className}
                       </span>
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className="inline-flex items-center px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm">
-                      {student.class}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
-                        <div
-                          className={`h-2 rounded-full transition-all ${
-                            student.engagement >= 80
-                              ? "bg-gradient-to-r from-[#10B981] to-[#14B8A6]"
-                              : student.engagement >= 60
-                              ? "bg-gradient-to-r from-[#F59E0B] to-[#FBBF24]"
-                              : "bg-gradient-to-r from-[#EF4444] to-[#F87171]"
-                          }`}
-                          style={{ width: `${student.engagement}%` }}
-                        />
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
+                          <div
+                            className={`h-2 rounded-full transition-all ${
+                              student.avgEngagement >= 80
+                                ? "bg-gradient-to-r from-[#10B981] to-[#14B8A6]"
+                                : student.avgEngagement >= 60
+                                ? "bg-gradient-to-r from-[#F59E0B] to-[#FBBF24]"
+                                : "bg-gradient-to-r from-[#EF4444] to-[#F87171]"
+                            }`}
+                            style={{ width: `${student.avgEngagement}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-[#1F2937] w-12">
+                          {student.avgEngagement}%
+                        </span>
+                        {student.avgEngagement >= 80 ? (
+                          <TrendingUp className="w-4 h-4 text-[#10B981]" />
+                        ) : student.avgEngagement < 60 ? (
+                          <TrendingDown className="w-4 h-4 text-[#EF4444]" />
+                        ) : null}
                       </div>
-                      <span className="text-sm font-medium text-[#1F2937] w-12">
-                        {student.engagement}%
+                    </td>
+                    <td className="py-4 px-6">
+                      <span className="text-sm font-medium text-[#1F2937]">
+                        {student.attendanceRate}%
                       </span>
-                      {student.engagement >= 80 ? (
-                        <TrendingUp className="w-4 h-4 text-[#10B981]" />
-                      ) : student.engagement < 60 ? (
-                        <TrendingDown className="w-4 h-4 text-[#EF4444]" />
-                      ) : null}
-                    </div>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span className="text-sm font-medium text-[#1F2937]">
-                      {student.attendance}%
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                        student.risk === "Low"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : student.risk === "Medium"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {student.risk === "High" && (
-                        <AlertTriangle className="w-3 h-3" />
-                      )}
-                      {student.risk}
-                    </span>
-                  </td>
-                  <td className="py-4 px-6">
-                    <div className="flex items-center gap-2">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          alert(`View ${student.name}'s profile`);
-                        }}
-                        className="p-2 text-[#3B82F6] hover:bg-blue-50 rounded-lg transition-all"
-                        title="View Profile"
+                    </td>
+                    <td className="py-4 px-6">
+                      <span
+                        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
+                          risk === "Low"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : risk === "Medium"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
                       >
-                        <Eye className="w-4 h-4" />
-                      </motion.button>
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          alert(`Edit ${student.name}'s details`);
-                        }}
-                        className="p-2 text-[#14B8A6] hover:bg-teal-50 rounded-lg transition-all"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </motion.button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
+                        {risk === "High" && (
+                          <AlertTriangle className="w-3 h-3" />
+                        )}
+                        {risk}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2">
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert(`View ${student.name}'s profile`);
+                          }}
+                          className="p-2 text-[#3B82F6] hover:bg-blue-50 rounded-lg transition-all"
+                          title="View Profile"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            alert(`Edit ${student.name}'s details`);
+                          }}
+                          className="p-2 text-[#14B8A6] hover:bg-teal-50 rounded-lg transition-all"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </motion.button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

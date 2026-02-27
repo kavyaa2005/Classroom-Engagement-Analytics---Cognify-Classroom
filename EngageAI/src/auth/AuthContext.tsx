@@ -23,11 +23,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const STORAGE_KEY = "engageai_user";
 const TOKEN_KEY = "engageai_token";
 
+const VALID_ROLES: UserRole[] = ["admin", "teacher", "student"];
+
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(() => {
         try {
             const stored = localStorage.getItem(STORAGE_KEY);
-            return stored ? JSON.parse(stored) : null;
+            if (!stored) return null;
+            const parsed = JSON.parse(stored) as AuthUser;
+            // Discard stale/corrupt entries that are missing a valid role
+            if (!parsed?.role || !VALID_ROLES.includes(parsed.role)) {
+                localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(TOKEN_KEY);
+                return null;
+            }
+            return parsed;
         } catch {
             return null;
         }
