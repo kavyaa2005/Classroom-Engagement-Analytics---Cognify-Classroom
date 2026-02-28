@@ -28,13 +28,13 @@ const VALID_ROLES: UserRole[] = ["admin", "teacher", "student"];
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(() => {
         try {
-            const stored = localStorage.getItem(STORAGE_KEY);
+            const stored = sessionStorage.getItem(STORAGE_KEY);
             if (!stored) return null;
             const parsed = JSON.parse(stored) as AuthUser;
             // Discard stale/corrupt entries that are missing a valid role
             if (!parsed?.role || !VALID_ROLES.includes(parsed.role)) {
-                localStorage.removeItem(STORAGE_KEY);
-                localStorage.removeItem(TOKEN_KEY);
+                sessionStorage.removeItem(STORAGE_KEY);
+                sessionStorage.removeItem(TOKEN_KEY);
                 return null;
             }
             return parsed;
@@ -44,12 +44,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     const [token, setTokenState] = useState<string | null>(() =>
-        localStorage.getItem(TOKEN_KEY)
+        sessionStorage.getItem(TOKEN_KEY)
     );
 
     const login = (role: UserRole, name: string, email: string, jwtToken?: string, id?: string) => {
         const newUser: AuthUser = { name, email, role, ...(id ? { _id: id } : {}) };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
         setUser(newUser);
         if (jwtToken) {
             setToken(jwtToken);
@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const logout = () => {
-        localStorage.removeItem(STORAGE_KEY);
+        sessionStorage.removeItem(STORAGE_KEY);
         removeToken();
         setUser(null);
         setTokenState(null);

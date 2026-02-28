@@ -5,9 +5,9 @@ const TOKEN_KEY = "engageai_token";
 
 // ─── Storage helpers ───────────────────────────────────────────────────────────
 
-export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
-export const setToken = (token: string): void => localStorage.setItem(TOKEN_KEY, token);
-export const removeToken = (): void => localStorage.removeItem(TOKEN_KEY);
+export const getToken = (): string | null => sessionStorage.getItem(TOKEN_KEY);
+export const setToken = (token: string): void => sessionStorage.setItem(TOKEN_KEY, token);
+export const removeToken = (): void => sessionStorage.removeItem(TOKEN_KEY);
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ api.interceptors.response.use(
     const isAuthEndpoint = url.includes("/api/auth/");
     if (error.response?.status === 401 && !isAuthEndpoint) {
       removeToken();
-      localStorage.removeItem("engageai_user");
+      sessionStorage.removeItem("engageai_user");
       window.location.href = "/login";
     }
     return Promise.reject(error);

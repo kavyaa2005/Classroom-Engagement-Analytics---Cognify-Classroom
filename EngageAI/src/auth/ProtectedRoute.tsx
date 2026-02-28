@@ -4,10 +4,10 @@ import type { UserRole } from "./AuthContext";
 const STORAGE_KEY = "engageai_user";
 const VALID_ROLES: UserRole[] = ["admin", "teacher", "student"];
 
-/** Read the stored user directly from localStorage — always sync, no race. */
+/** Read the stored user directly from sessionStorage — always sync, no race. Each tab is isolated. */
 function getStoredUser(): { role: UserRole } | null {
     try {
-        const raw = localStorage.getItem(STORAGE_KEY);
+        const raw = sessionStorage.getItem(STORAGE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
         if (parsed?.role && VALID_ROLES.includes(parsed.role)) return parsed;
@@ -27,7 +27,7 @@ interface ProtectedRouteProps {
  * Guards a route subtree by role.
  * – When used as a layout route (no children):  renders <Outlet /> on auth success.
  * – When used with children (standalone page):  renders {children} on auth success.
- * Reads localStorage directly so there is ZERO timing race with React state.
+ * Reads sessionStorage directly so there is ZERO timing race with React state. Each tab is fully isolated.
  */
 export function ProtectedRoute({ role, children }: ProtectedRouteProps) {
     const user = getStoredUser();
