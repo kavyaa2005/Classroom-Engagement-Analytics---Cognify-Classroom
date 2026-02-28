@@ -92,28 +92,28 @@ const run = async () => {
 
   // ── Students Class 10A ────────────────────────────────────────────────────
   const studentsA = await createUsers([
-    { name: "Aarav Patel",    email: "aarav@student.edu",   password: "student123", role: "student", rollNumber: "10A01", isActive: true },
-    { name: "Ananya Singh",   email: "ananya@student.edu",  password: "student123", role: "student", rollNumber: "10A02", isActive: true },
-    { name: "Rohan Verma",    email: "rohan@student.edu",   password: "student123", role: "student", rollNumber: "10A03", isActive: true },
-    { name: "Priya Nair",     email: "priya@student.edu",   password: "student123", role: "student", rollNumber: "10A04", isActive: true },
-    { name: "Karan Malhotra", email: "karan@student.edu",   password: "student123", role: "student", rollNumber: "10A05", isActive: true },
-    { name: "Sneha Reddy",    email: "sneha@student.edu",   password: "student123", role: "student", rollNumber: "10A06", isActive: true },
-    { name: "Rahul Gupta",    email: "rahul@student.edu",   password: "student123", role: "student", rollNumber: "10A07", isActive: true },
-    { name: "Divya Iyer",     email: "divya@student.edu",   password: "student123", role: "student", rollNumber: "10A08", isActive: true },
-    { name: "Aryan Kumar",    email: "aryan@student.edu",   password: "student123", role: "student", rollNumber: "10A09", isActive: true },
-    { name: "Meera Joshi",    email: "meera@student.edu",   password: "student123", role: "student", rollNumber: "10A10", isActive: true },
+    { name: "Aarav Patel",    email: "aarav@school.edu",   password: "student123", role: "student", rollNumber: "10A01", isActive: true },
+    { name: "Ananya Singh",   email: "ananya@school.edu",  password: "student123", role: "student", rollNumber: "10A02", isActive: true },
+    { name: "Rohan Verma",    email: "rohan@school.edu",   password: "student123", role: "student", rollNumber: "10A03", isActive: true },
+    { name: "Priya Nair",     email: "priya@school.edu",   password: "student123", role: "student", rollNumber: "10A04", isActive: true },
+    { name: "Karan Malhotra", email: "karan@school.edu",   password: "student123", role: "student", rollNumber: "10A05", isActive: true },
+    { name: "Sneha Reddy",    email: "sneha@school.edu",   password: "student123", role: "student", rollNumber: "10A06", isActive: true },
+    { name: "Rahul Gupta",    email: "rahul@school.edu",   password: "student123", role: "student", rollNumber: "10A07", isActive: true },
+    { name: "Divya Iyer",     email: "divya@school.edu",   password: "student123", role: "student", rollNumber: "10A08", isActive: true },
+    { name: "Aryan Kumar",    email: "aryan@school.edu",   password: "student123", role: "student", rollNumber: "10A09", isActive: true },
+    { name: "Meera Joshi",    email: "meera@school.edu",   password: "student123", role: "student", rollNumber: "10A10", isActive: true },
   ]);
 
   // ── Students Class 10B ────────────────────────────────────────────────────
   const studentsB = await createUsers([
-    { name: "Aditya Shah",  email: "aditya@student.edu",  password: "student123", role: "student", rollNumber: "10B01", isActive: true },
-    { name: "Ishaan Roy",   email: "ishaan@student.edu",  password: "student123", role: "student", rollNumber: "10B02", isActive: true },
-    { name: "Kaveri Menon", email: "kaveri@student.edu",  password: "student123", role: "student", rollNumber: "10B03", isActive: true },
-    { name: "Neel Saxena",  email: "neel@student.edu",    password: "student123", role: "student", rollNumber: "10B04", isActive: true },
-    { name: "Riya Desai",   email: "riya@student.edu",    password: "student123", role: "student", rollNumber: "10B05", isActive: true },
-    { name: "Vikram Bose",  email: "vikram@student.edu",  password: "student123", role: "student", rollNumber: "10B06", isActive: true },
-    { name: "Pooja Pillai", email: "pooja@student.edu",   password: "student123", role: "student", rollNumber: "10B07", isActive: true },
-    { name: "Sahil Kapoor", email: "sahil@student.edu",   password: "student123", role: "student", rollNumber: "10B08", isActive: true },
+    { name: "Aditya Shah",  email: "aditya@school.edu",  password: "student123", role: "student", rollNumber: "10B01", isActive: true },
+    { name: "Ishaan Roy",   email: "ishaan@school.edu",  password: "student123", role: "student", rollNumber: "10B02", isActive: true },
+    { name: "Kaveri Menon", email: "kaveri@school.edu",  password: "student123", role: "student", rollNumber: "10B03", isActive: true },
+    { name: "Neel Saxena",  email: "neel@school.edu",    password: "student123", role: "student", rollNumber: "10B04", isActive: true },
+    { name: "Riya Desai",   email: "riya@school.edu",    password: "student123", role: "student", rollNumber: "10B05", isActive: true },
+    { name: "Vikram Bose",  email: "vikram@school.edu",  password: "student123", role: "student", rollNumber: "10B06", isActive: true },
+    { name: "Pooja Pillai", email: "pooja@school.edu",   password: "student123", role: "student", rollNumber: "10B07", isActive: true },
+    { name: "Sahil Kapoor", email: "sahil@school.edu",   password: "student123", role: "student", rollNumber: "10B08", isActive: true },
   ]);
   console.log(`Students: ${studentsA.length} in 10A, ${studentsB.length} in 10B`);
 
@@ -265,8 +265,8 @@ const run = async () => {
   console.log(" Admin     : admin@school.edu     / admin123");
   console.log(" Teacher 1 : kavya@school.edu     / teacher123  (Math 10A)");
   console.log(" Teacher 2 : arjun@school.edu     / teacher123  (Physics 10B)");
-  console.log(" Students  : aarav@student.edu    / student123  (+9 more 10A)");
-  console.log("           : aditya@student.edu   / student123  (+7 more 10B)");
+  console.log(" Students  : aarav@school.edu    / student123  (+9 more 10A)");
+  console.log("           : aditya@school.edu   / student123  (+7 more 10B)");
   console.log(` Sessions  : ${totalSessions}`);
   console.log(` Records   : ${totalRecords}`);
   console.log("==================================================\n");

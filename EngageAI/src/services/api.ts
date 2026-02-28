@@ -25,11 +25,15 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// On 401, clear storage and redirect to login
+// On 401 (expired/invalid token), clear storage and redirect to login.
+// Skip auth endpoints — a failed login also returns 401 but should show
+// the error message in the form, not redirect.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const url: string = error.config?.url ?? "";
+    const isAuthEndpoint = url.includes("/api/auth/");
+    if (error.response?.status === 401 && !isAuthEndpoint) {
       removeToken();
       localStorage.removeItem("engageai_user");
       window.location.href = "/login";
