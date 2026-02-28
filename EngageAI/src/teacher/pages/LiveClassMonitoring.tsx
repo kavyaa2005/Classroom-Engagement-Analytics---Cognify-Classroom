@@ -75,8 +75,8 @@ export function LiveClassMonitoring() {
     students: { _id: string; name: string; email: string }[];
   } | null>(null);
   const [timelineData, setTimelineData] = useState<TimelinePoint[]>([]);
-  const [liveStudentMap, setLiveStudentMap] = useState<Record<string, { score: number; state: string }>>({});
-  const [emotions, setEmotions] = useState<EmotionBar[]>([
+  const [liveStudentMap, setLiveStudentMap] = useState<Record<string, { score: number; state: string }>>({});  // Tracks every student who joined live (name keyed by studentId) — persists even if not pre-assigned
+  const [liveRoster, setLiveRoster] = useState<Record<string, { name: string; online: boolean }>>({});   const [emotions, setEmotions] = useState<EmotionBar[]>([
     { icon: Smile, label: "Engaged", value: 65, color: "#10B981" },
     { icon: Meh,   label: "Neutral", value: 25, color: "#F59E0B" },
     { icon: Frown, label: "Confused", value: 10, color: "#F87171" },
@@ -151,6 +151,7 @@ export function LiveClassMonitoring() {
       studentStates.current = {};
       setTimelineData([]);
       setLiveStudentMap({});
+      setLiveRoster({});
       lastTimelineAt.current = 0;
       setShowStartModal(false);
 
@@ -170,9 +171,17 @@ export function LiveClassMonitoring() {
       // Listen for per-student engagement updates
       sock.on("engagement:update", (payload: {
         studentId: string;
+        name?: string;
         engagementPercent: number;
         state: string;
       }) => {
+        // Seed live roster with name in case student:connected was missed
+        if (payload.name) {
+          setLiveRoster(prev => ({
+            ...prev,
+            [payload.studentId]: { name: payload.name!, online: true },
+          }));
+        }
         studentEngagements.current[payload.studentId] = payload.engagementPercent;
         studentStates.current[payload.studentId]      = payload.state;
 
@@ -204,13 +213,21 @@ export function LiveClassMonitoring() {
       });
 
       // Student join / leave
-      sock.on("student:connected", () => {
+      sock.on("student:connected", (p: { studentId: string; name: string }) => {
         setConnectedStudents((n) => n + 1);
+        setLiveRoster(prev => ({
+          ...prev,
+          [p.studentId]: { name: p.name, online: true },
+        }));
       });
-      sock.on("student:disconnected", (p: { studentId: string }) => {
+      sock.on("student:disconnected", (p: { studentId: string; name?: string }) => {
         setConnectedStudents((n) => Math.max(0, n - 1));
         delete studentEngagements.current[p.studentId];
         delete studentStates.current[p.studentId];
+        setLiveRoster(prev => prev[p.studentId]
+          ? { ...prev, [p.studentId]: { ...prev[p.studentId], online: false } }
+          : prev
+        );
       });
 
       setIsMonitoring(true);
@@ -237,6 +254,7 @@ export function LiveClassMonitoring() {
     studentEngagements.current = {};
     studentStates.current = {};
     setLiveStudentMap({});
+    setLiveRoster({});
   }, [sessionId]);
 
   const getStateColor = (state: string) => {
@@ -429,7 +447,7 @@ export function LiveClassMonitoring() {
               <div className="flex items-center gap-2">
                 <h2 className="text-[18px] font-semibold text-[#1E293B]">Class Roster</h2>
                 <span className="text-[12px] text-[#64748B] bg-[#F1F5F9] rounded-full px-2.5 py-0.5">
-                  {classroom?.students?.length ?? 0} students
+                  {(classroom?.students?.length ?? 0) + Object.keys(liveRoster).filter(id => !(classroom?.students ?? []).find(s => s._id === id)).length} students
                 </span>
               </div>
               {isMonitoring && (
@@ -449,18 +467,28 @@ export function LiveClassMonitoring() {
             </div>
 
             {/* Roster grid */}
-            {(classroom?.students?.length ?? 0) > 0 ? (
+            {(() => {
+              // Merge pre-assigned students with live-joined students (joined via code)
+              const preAssigned = classroom?.students ?? [];
+              const preAssignedIds = new Set(preAssigned.map((s) => s._id));
+              const liveOnly = Object.entries(liveRoster)
+                .filter(([id]) => !preAssignedIds.has(id))
+                .map(([id, info]) => ({ _id: id, name: info.name, email: "" }));
+              const allStudents = [...preAssigned, ...liveOnly];
+              return allStudents.length > 0 || isMonitoring ? (allStudents.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                {(classroom?.students ?? []).map((student, idx) => {
+                {allStudents.map((student, idx) => {
                   const live = liveStudentMap[student._id];
+                  const rosterEntry = liveRoster[student._id];
+                  const isOffline = rosterEntry ? !rosterEntry.online : false;
                   const initials = student.name
                     .split(" ")
                     .map((w) => w[0])
                     .join("")
                     .slice(0, 2)
                     .toUpperCase();
-                  const color = live ? getStateColor(live.state) : isMonitoring ? "#CBD5E1" : "#E2E8F0";
-                  const stateLabel = live ? live.state : isMonitoring ? "Connecting…" : "Ready";
+                  const color = isOffline ? "#CBD5E1" : live ? getStateColor(live.state) : isMonitoring ? "#CBD5E1" : "#E2E8F0";
+                  const stateLabel = isOffline ? "Offline" : live ? live.state : isMonitoring ? "Connecting…" : "Ready";
                   const score = live ? live.score : null;
                   return (
                     <motion.div
@@ -514,12 +542,21 @@ export function LiveClassMonitoring() {
                 })}
               </div>
             ) : (
+              // Monitoring active but no students have joined yet
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <Users className="w-12 h-12 text-[#CBD5E1] mb-3" />
-                <p className="text-[15px] font-medium text-[#64748B]">No students assigned</p>
-                <p className="text-[13px] text-[#94A3B8] mt-1">Add students to your classroom to see live engagement</p>
+                <p className="text-[15px] font-medium text-[#64748B]">Waiting for students…</p>
+                <p className="text-[13px] text-[#94A3B8] mt-1">Students will appear here as they join the session</p>
               </div>
-            )}
+            )) : (
+              // Not monitoring and no students at all
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <Users className="w-12 h-12 text-[#CBD5E1] mb-3" />
+                <p className="text-[15px] font-medium text-[#64748B]">No students yet</p>
+                <p className="text-[13px] text-[#94A3B8] mt-1">Start monitoring and share the join code with your class</p>
+              </div>
+            );
+            })()}
 
             {/* Attention Waveform during monitoring */}
             {isMonitoring && (
