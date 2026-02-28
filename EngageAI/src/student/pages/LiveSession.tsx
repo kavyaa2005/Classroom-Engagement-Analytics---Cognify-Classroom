@@ -16,7 +16,7 @@ import {
 import { connectSocket, disconnectSocket } from "../../services/socket";
 import api from "../../services/api";
 
-const AI_URL = "http://localhost:8000";
+const AI_URL = "http://localhost:8001";
 const CAPTURE_INTERVAL_MS = 3000;
 
 interface AIResult {
